@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+
+{% block styles %}
+{{ super() }}
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/dist/dist/vis-network.min.css">
+{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>Network Monitoring Dashboard</h2>
+        </div>
+    </div>
+
+    <!-- Network Tools Section -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Network Tools</h4>
+                </div>
+                <div class="card-body">
+                    {% if current_user.is_admin %}
+                    <div class="mb-3">
+                        <a href="{{ url_for('admin.users') }}" class="btn btn-warning w-100">
+                            <i class="fas fa-users"></i> Manage Users
+                        </a>
+                    </div>
+                    <hr>
+                    {% endif %}
+                    <div class="mb-3">
+                        <button id="show-ip-btn" class="btn btn-primary">Show My IP Address</button>
+                        <p class="mt-2">Your IP: <span id="ip-display">Click button to show</span></p>
+                    </div>
+                    <div class="mb-3">
+                        <label for="ip-input" class="form-label">IP Address for CIDR Calculation:</label>
+                        <input type="text" class="form-control" id="ip-input">
+                        <button id="calculate-cidr-btn" class="btn btn-primary mt-2">Calculate CIDR</button>
+                        <div id="cidr-results"></div>
+                    </div>
+                    <div class="mb-3 mt-4">
+                        <label for="ping-ip-input" class="form-label">IP Address to Ping:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="ping-ip-input" value="127.0.0.1" placeholder="Enter IP address">
+                            <button id="ping-ip-btn" class="btn btn-primary">Ping</button>
+                        </div>
+                        <div id="ping-results" class="mt-2"></div>
+                    </div>
+                    <div class="mb-3 mt-4">
+                        <button id="show-system-info-btn" class="btn btn-primary">Show System Information</button>
+                        <div id="system-info" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Network Visualization</h4>
+                </div>
+                <div class="card-body">
+                    <div id="network" style="height: 400px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Network Status Overview -->
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Network Status</h4>
+                </div>
+                <div class="card-body">
+                    <div class="row">
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h5>Total Devices</h5>
+                                <h2>{{ devices|length }}</h2>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h5>Online</h5>
+                                <h2 class="text-success">{{ devices|selectattr('status', 'equalto', 'online')|list|length }}</h2>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="text-center">
+                                <h5>Issues</h5>
+                                <h2 class="text-danger">{{ devices|selectattr('status', 'equalto', 'DOWN')|list|length }}</h2>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Device List -->
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h4>Devices</h4>
+                    <a href="{{ url_for('monitor.devices') }}" class="btn btn-primary btn-sm">View All</a>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Hostname</th>
+                                    <th>IP Address</th>
+                                    <th>Status</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for device in devices %}
+                                <tr>
+                                    <td>{{ device.hostname }}</td>
+                                    <td>{{ device.ip_address }}</td>
+                                    <td>
+                                        {% if device.status == 'online' %}
+                                        <span class="badge bg-success">Online</span>
+                                        {% elif device.status == 'offline' %}
+                                        <span class="badge bg-danger">Offline</span>
+                                        {% else %}
+                                        <span class="badge bg-warning">Unknown</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>{{ device.last_seen.strftime('%Y-%m-%d %H:%M:%S') if device.last_seen }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/dist/vis-network.min.js"></script>
+<script src="{{ url_for('static', filename='js/network.js') }}"></script>
+<script src="{{ url_for('static', filename='js/network-tools.js') }}"></script>
+{% endblock %}

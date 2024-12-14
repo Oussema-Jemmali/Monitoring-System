@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <h2>Network Monitoring Dashboard</h2>
+
+    <div class="row mt-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Network Tools</h5>
+                </div>
+                <div class="card-body">
+                    {% if current_user.is_admin %}
+                    <div class="mb-3">
+                        <a href="{{ url_for('admin.manage_users') }}" class="btn btn-warning w-100">
+                            <i class="fas fa-users"></i> Manage Users
+                        </a>
+                    </div>
+                    <hr>
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <button class="btn btn-primary" id="showIpBtn">
+                            <i class="fas fa-network-wired"></i> Show My IP Address
+                        </button>
+                        <p class="mt-2">Your IP: <span id="ipAddress">Click button to show</span></p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">IP Address for CIDR Calculation:</label>
+                        <input type="text" class="form-control" id="cidrInput">
+                        <button class="btn btn-primary mt-2" id="calculateCidr">
+                            <i class="fas fa-calculator"></i> Calculate CIDR
+                        </button>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label">IP Address to Ping:</label>
+                        <div class="input-group">
+                            <input type="text" class="form-control" id="pingInput" value="127.0.0.1">
+                            <button class="btn btn-primary" id="pingBtn">
+                                <i class="fas fa-satellite-dish"></i> Ping
+                            </button>
+                        </div>
+                    </div>
+
+                    <button class="btn btn-primary" id="sysInfoBtn">
+                        <i class="fas fa-info-circle"></i> Show System Information
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Network Visualization</h5>
+                </div>
+                <div class="card-body">
+                    <div id="network-container" style="height: 400px; border: 1px solid #ddd; border-radius: 4px;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-4">
+        <div class="col-md-8">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Network Status</h5>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Device</th>
+                                    <th>IP Address</th>
+                                    <th>Status</th>
+                                    <th>Last Seen</th>
+                                </tr>
+                            </thead>
+                            <tbody id="networkStatus">
+                                <!-- Network status will be populated by JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">Device Status</h5>
+                    <a href="{{ url_for('monitor.devices') }}" class="btn btn-sm btn-primary">
+                        <i class="fas fa-server"></i> View All
+                    </a>
+                </div>
+                <div class="card-body">
+                    <div id="deviceStatus">
+                        {% for device in devices %}
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span>{{ device.hostname }}</span>
+                            <span class="badge bg-{{ 'success' if device.status == 'UP' else 'danger' }}">
+                                {{ device.status }}
+                            </span>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<!-- Include vis.js for network visualization -->
+<script src="https://unpkg.com/vis-network/standalone/umd/vis-network.min.js"></script>
+<script src="{{ url_for('static', filename='js/network.js') }}"></script>
+{% endblock %}

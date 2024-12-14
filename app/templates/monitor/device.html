@@ -1,0 +1,181 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h2>Device Details: {{ device.hostname }}</h2>
+                {% if current_user.is_admin %}
+                <div>
+                    <button class="btn btn-primary" onclick="testConnection({{ device.id }})">Test Connection</button>
+                    <form action="{{ url_for('monitor.delete_device', device_id=device.id) }}" method="POST" class="d-inline">
+                        <button type="submit" class="btn btn-danger" onclick="return confirm('Are you sure you want to delete this device?')">Delete Device</button>
+                    </form>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Connection Test Alert -->
+    <div class="row mb-4" id="connectionTestAlert" style="display: none;">
+        <div class="col-md-12">
+            <div class="alert" role="alert">
+                <span id="connectionTestMessage"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <!-- Device Information -->
+        <div class="col-md-6">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4>Device Information</h4>
+                </div>
+                <div class="card-body">
+                    <table class="table">
+                        <tr>
+                            <th>Hostname:</th>
+                            <td>{{ device.hostname }}</td>
+                        </tr>
+                        <tr>
+                            <th>IP Address:</th>
+                            <td>{{ device.ip_address }}</td>
+                        </tr>
+                        <tr>
+                            <th>MAC Address:</th>
+                            <td>{{ device.mac_address or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Device Type:</th>
+                            <td>{{ device.device_type or 'N/A' }}</td>
+                        </tr>
+                        <tr>
+                            <th>Status:</th>
+                            <td>
+                                {% set last_result = device.monitoring_results[-1] if device.monitoring_results else None %}
+                                {% if last_result %}
+                                    <span class="badge bg-{{ 'success' if last_result.status == 'UP' else 'danger' }}">
+                                        {{ last_result.status }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary">Unknown</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr>
+                            <th>Last Seen:</th>
+                            <td>
+                                {% if last_result %}
+                                    {{ last_result.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}
+                                {% else %}
+                                    Never
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <!-- Recent Alerts -->
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Recent Alerts</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Type</th>
+                                    <th>Message</th>
+                                    <th>Severity</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for alert in device.alerts[-5:]|reverse %}
+                                <tr>
+                                    <td>{{ alert.timestamp.strftime('%Y-%m-%d %H:%M:%S') }}</td>
+                                    <td>{{ alert.alert_type }}</td>
+                                    <td>{{ alert.message }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'danger' if alert.severity == 'critical' else 'warning' if alert.severity == 'warning' else 'info' }}">
+                                            {{ alert.severity }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        {% if alert.acknowledged %}
+                                            <span class="badge bg-success">Acknowledged</span>
+                                        {% else %}
+                                            <span class="badge bg-warning">Pending</span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+function testConnection(deviceId) {
+    // Disable the test button and show loading state
+    const testButton = document.querySelector('.btn-primary');
+    const originalText = testButton.textContent;
+    testButton.disabled = true;
+    testButton.innerHTML = '<span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span> Testing...';
+
+    // Hide any existing alert
+    const alertDiv = document.getElementById('connectionTestAlert');
+    const alertMessage = document.getElementById('connectionTestMessage');
+    alertDiv.style.display = 'none';
+
+    // Make the API call
+    fetch(`/device/${deviceId}/test-connection`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    })
+    .then(response => response.json())
+    .then(data => {
+        // Show the result
+        alertDiv.style.display = 'block';
+        alertDiv.querySelector('.alert').className = `alert alert-${data.status === 'UP' ? 'success' : 'danger'}`;
+        alertMessage.textContent = data.message;
+
+        // Update the status badge if it exists
+        const statusBadge = document.querySelector('td .badge');
+        if (statusBadge) {
+            statusBadge.className = `badge bg-${data.status === 'UP' ? 'success' : 'danger'}`;
+            statusBadge.textContent = data.status;
+        }
+    })
+    .catch(error => {
+        // Show error message
+        alertDiv.style.display = 'block';
+        alertDiv.querySelector('.alert').className = 'alert alert-danger';
+        alertMessage.textContent = 'An error occurred while testing the connection.';
+    })
+    .finally(() => {
+        // Reset the button state
+        testButton.disabled = false;
+        testButton.textContent = originalText;
+    });
+}
+</script>
+{% endblock %}
