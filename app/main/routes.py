@@ -1,28 +1,70 @@
-from flask import render_template, jsonify, request
+import os
+import psutil
+import platform
+import socket
+import wmi
+import subprocess
+from datetime import datetime
+from flask import render_template, flash, redirect, url_for, request, jsonify
 from flask_login import login_required, current_user
 from app.main import bp
-from app.models import Device, MonitoringResult, User
-from app.decorators import admin_required
+from app.models import User, Alert
 from app import db
 import requests
 from netaddr import IPNetwork
-import psutil
-import platform
 import json
-import wmi
-import socket
-import subprocess
 
 @bp.route('/')
 @bp.route('/index')
 @login_required
 def index():
-    devices = Device.query.filter_by(user_id=current_user.id).all()
-    down_devices = [d for d in devices if d.status == 'DOWN']
+    # Get and update current user's IP address
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        local_ip = s.getsockname()[0]
+        s.close()
+        current_user.ip_address = local_ip
+        db.session.commit()
+    except Exception as e:
+        print(f"Error updating IP address: {str(e)}")
+    
+    # Get system info for current user
+    system_info = get_system_info()
+    
+    # Get all online users
+    online_users = User.query.filter_by(is_online=True).all()
+    
+    # Get user's alerts
+    alerts = Alert.query.filter_by(user_id=current_user.id).order_by(Alert.timestamp.desc()).limit(5).all()
+    
+    # Get information for each user
+    users_info = []
+    for user in online_users:
+        try:
+            user_info = {
+                'username': user.username,
+                'email': user.email,
+                'ip_address': user.ip_address,
+                'department': user.department,
+                'last_seen': user.last_seen,
+                'system_info': {
+                    'is_online': user.is_online,
+                    'username': user.username,
+                    'ip_address': user.ip_address,
+                    'last_seen': user.last_seen.strftime('%Y-%m-%d %H:%M:%S') if user.last_seen else None
+                }
+            }
+            users_info.append(user_info)
+        except Exception as e:
+            print(f"Error getting info for {user.username}: {str(e)}")
+            continue
+    
     return render_template('main/index.html', 
                          title='Home',
-                         devices=devices,
-                         down_devices=down_devices)
+                         system_info=system_info,
+                         users_info=users_info,
+                         alerts=alerts)
 
 @bp.route('/get_ip', methods=['GET'])
 @login_required
@@ -95,20 +137,20 @@ def get_network_users():
                 })
                 
                 # Add connections between users based on their devices
-                user_devices = Device.query.filter_by(user_id=user.id).all()
-                if user_devices:
-                    for device in user_devices:
-                        edges.append({
-                            'from': user.id,
-                            'to': device.id + 1000,  # Offset to avoid ID conflicts
-                            'color': '#2ecc71'  # Green for device connections
-                        })
-                        nodes.append({
-                            'id': device.id + 1000,
-                            'label': device.hostname,
-                            'color': '#2ecc71',
-                            'size': 20
-                        })
+                # user_devices = Device.query.filter_by(user_id=user.id).all()
+                # if user_devices:
+                #     for device in user_devices:
+                #         edges.append({
+                #             'from': user.id,
+                #             'to': device.id + 1000,  # Offset to avoid ID conflicts
+                #             'color': '#2ecc71'  # Green for device connections
+                #         })
+                #         nodes.append({
+                #             'id': device.id + 1000,
+                #             'label': device.hostname,
+                #             'color': '#2ecc71',
+                #             'size': 20
+                #         })
         
         return jsonify({
             'nodes': nodes,
@@ -118,100 +160,109 @@ def get_network_users():
         print(f"Error in get_network_users: {str(e)}")  # Debug print
         return jsonify({'error': str(e)}), 500
 
+@bp.route('/network_data')
+@login_required
+def network_data():
+    try:
+        # Get all users
+        users = User.query.all()
+        
+        # Get default gateway
+        gateway = get_default_gateway()
+        
+        # Prepare nodes and edges for visualization
+        nodes = []
+        edges = []
+        
+        # Add gateway node
+        nodes.append({
+            'id': 'gateway',
+            'label': f'Gateway\n{gateway}',
+            'group': 'gateway',
+            'shape': 'diamond',
+            'size': 30
+        })
+        
+        # Add nodes for each user
+        for user in users:
+            node_data = {
+                'id': user.id,
+                'label': f'{user.username}\n{user.ip_address}',
+                'group': 'user',
+                'shape': 'dot',
+                'size': 20
+            }
+            
+            # Different colors for online/offline status
+            if user.is_online:
+                node_data['color'] = {
+                    'background': '#28a745',
+                    'border': '#1e7e34'
+                }
+            else:
+                node_data['color'] = {
+                    'background': '#dc3545',
+                    'border': '#bd2130'
+                }
+            
+            nodes.append(node_data)
+            
+            # Add edge between user and gateway
+            edges.append({
+                'from': 'gateway',
+                'to': user.id,
+                'length': 200,
+                'color': {
+                    'color': '#2196F3',
+                    'opacity': 0.8
+                },
+                'arrows': {
+                    'to': {
+                        'enabled': True,
+                        'scaleFactor': 0.5
+                    }
+                }
+            })
+        
+        return jsonify({
+            'nodes': nodes,
+            'edges': edges
+        })
+        
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @bp.route('/system_info', methods=['GET'])
 @login_required
 def get_system_info():
     try:
-        # Get RAM info
-        ram = psutil.virtual_memory()
+        print("Starting system info collection...")  # Debug print
         
-        # Get Windows version
-        os_info = platform.uname()
-
-        # Get CPU info using WMI
-        w = wmi.WMI()
-        cpu = w.Win32_Processor()[0]
-
-        # Get disk info
-        disks = []
-        for disk in psutil.disk_partitions():
-            try:
-                usage = psutil.disk_usage(disk.mountpoint)
-                disks.append({
-                    'device': disk.device,
-                    'mountpoint': disk.mountpoint,
-                    'total': f"{usage.total / (1024**3):.1f}GB",
-                    'used': f"{usage.used / (1024**3):.1f}GB",
-                    'free': f"{usage.free / (1024**3):.1f}GB",
-                    'percent': f"{usage.percent}%"
-                })
-            except:
-                continue
-
+        # Get the current user's system info
+        user = current_user
+        
         system_info = {
-            'os': {
-                'name': os_info.system,
-                'version': os_info.version,
-                'architecture': platform.architecture()[0]
-            },
-            'cpu': {
-                'brand': cpu.Name,
-                'cores': psutil.cpu_count(logical=False),
-                'threads': psutil.cpu_count(logical=True),
-                'usage': f"{psutil.cpu_percent()}%",
-                'frequency': f"{cpu.MaxClockSpeed}MHz"
-            },
-            'ram': {
-                'total': f"{ram.total / (1024**3):.1f}GB",
-                'available': f"{ram.available / (1024**3):.1f}GB",
-                'used': f"{ram.used / (1024**3):.1f}GB",
-                'percent': f"{ram.percent}%"
-            },
-            'disks': disks
+            'username': user.username,
+            'ip_address': user.ip_address,
+            'is_online': user.is_online,
+            'last_seen': user.last_seen.strftime('%Y-%m-%d %H:%M:%S') if user.last_seen else None
         }
         
+        print(f"Returning system info: {system_info}")  # Debug print
         return jsonify(system_info)
-    except Exception as e:
-        print(f"Error in get_system_info: {str(e)}")  # Debug print
-        return jsonify({'error': str(e)}), 500
-
-@bp.route('/ping_user/<int:user_id>', methods=['GET'])
-@login_required
-def ping_user(user_id):
-    try:
-        target_user = User.query.get_or_404(user_id)
-        # Get the last known device for the user
-        device = Device.query.filter_by(user_id=user_id).order_by(Device.last_seen.desc()).first()
         
-        if not device or not device.ip_address:
-            return jsonify({'error': 'No IP address found for this user'}), 404
-            
-        # Run ping command
-        try:
-            # Run ping with a timeout of 2 seconds and 4 packets
-            output = subprocess.check_output(['ping', '-n', '4', '-w', '2000', device.ip_address], 
-                                          universal_newlines=True)
-            
-            # Parse ping results
-            lines = output.split('\n')
-            stats = lines[-3:-1]  # Get the last few lines containing statistics
-            
-            return jsonify({
-                'success': True,
-                'target_user': target_user.username,
-                'ip_address': device.ip_address,
-                'results': stats
-            })
-        except subprocess.CalledProcessError:
-            return jsonify({
-                'success': False,
-                'target_user': target_user.username,
-                'ip_address': device.ip_address,
-                'error': 'Host unreachable'
-            })
-            
     except Exception as e:
-        return jsonify({'error': str(e)}), 500
+        error_msg = f"Error in get_system_info: {str(e)}"
+        print(error_msg)  # Debug print
+        import traceback
+        print(traceback.format_exc())  # Print full traceback
+        return jsonify({
+            'error': error_msg,
+            'username': current_user.username,
+            'ip_address': current_user.ip_address,
+            'is_online': current_user.is_online,
+            'last_seen': current_user.last_seen.strftime('%Y-%m-%d %H:%M:%S') if current_user.last_seen else None
+        }), 500
 
 @bp.route('/ping_ip', methods=['POST'])
 @login_required
@@ -241,3 +292,59 @@ def ping_ip():
             
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+@bp.route('/ping', methods=['POST'])
+@login_required
+def ping():
+    try:
+        target_ip = request.json.get('ip_address')
+        if not target_ip:
+            return jsonify({'error': 'No IP address provided'}), 400
+
+        # Run ping command with a timeout of 2 seconds and 4 packets
+        output = subprocess.check_output(['ping', '-n', '4', '-w', '2000', target_ip], 
+                                      universal_newlines=True)
+        
+        # Parse ping results
+        lines = output.split('\n')
+        stats = lines[-3:-1]  # Get the last few lines containing statistics
+        
+        return jsonify({
+            'success': True,
+            'target': target_ip,
+            'results': stats
+        })
+    except subprocess.CalledProcessError:
+        return jsonify({
+            'success': False,
+            'target': target_ip,
+            'error': 'Host unreachable'
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+def get_default_gateway():
+    try:
+        # Run ipconfig command and capture output
+        result = subprocess.run(['ipconfig'], capture_output=True, text=True)
+        lines = result.stdout.split('\n')
+        
+        # Look for default gateway
+        for line in lines:
+            if 'Default Gateway' in line and '.' in line:
+                return line.split(':')[-1].strip()
+    except:
+        pass
+    return 'Not found'
+
+def get_mac_address():
+    try:
+        # Get the MAC address of the first network interface
+        interfaces = psutil.net_if_addrs()
+        for interface, addrs in interfaces.items():
+            for addr in addrs:
+                if addr.family == psutil.AF_LINK:
+                    return addr.address
+    except:
+        pass
+    return 'Not found'

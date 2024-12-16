@@ -1,0 +1,145 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>Connected Devices</h2>
+            <p class="text-muted">Showing all currently connected users and their system information</p>
+        </div>
+    </div>
+
+    <div class="row">
+        {% for user_info in users_info %}
+        <div class="col-md-6 mb-4">
+            <div class="card h-100">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">
+                        <i class="fas fa-desktop me-2"></i>{{ user_info.username }}
+                    </h5>
+                    <span class="badge bg-success">Online</span>
+                </div>
+                <div class="card-body">
+                    <div class="mb-3">
+                        <h6 class="text-muted">User Information</h6>
+                        <ul class="list-unstyled">
+                            <li><strong>Email:</strong> {{ user_info.email }}</li>
+                            <li><strong>Department:</strong> {{ user_info.department }}</li>
+                            <li><strong>IP Address:</strong> {{ user_info.ip_address }}</li>
+                            <li><strong>Last Seen:</strong> {{ user_info.last_seen.strftime('%Y-%m-%d %H:%M:%S') }}</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="mb-3">
+                        <h6 class="text-muted">System Information</h6>
+                        <div class="table-responsive">
+                            <table class="table table-sm">
+                                <tbody>
+                                    <tr>
+                                        <th>CPU Usage:</th>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar" role="progressbar" 
+                                                     style="width: {{ user_info.system_info.cpu_percent }}%;"
+                                                     aria-valuenow="{{ user_info.system_info.cpu_percent }}" 
+                                                     aria-valuemin="0" aria-valuemax="100">
+                                                    {{ user_info.system_info.cpu_percent }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>Memory Usage:</th>
+                                        <td>
+                                            <div class="progress" style="height: 20px;">
+                                                <div class="progress-bar bg-info" role="progressbar" 
+                                                     style="width: {{ user_info.system_info.memory_percent }}%;"
+                                                     aria-valuenow="{{ user_info.system_info.memory_percent }}" 
+                                                     aria-valuemin="0" aria-valuemax="100">
+                                                    {{ user_info.system_info.memory_percent }}%
+                                                </div>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <th>OS:</th>
+                                        <td>{{ user_info.system_info.os_info }}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Boot Time:</th>
+                                        <td>{{ user_info.system_info.boot_time }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                    
+                    <div class="text-end">
+                        <button class="btn btn-sm btn-primary ping-btn" data-ip="{{ user_info.ip_address }}">
+                            <i class="fas fa-network-wired"></i> Ping
+                        </button>
+                    </div>
+                    <div class="ping-results mt-2" style="display: none;"></div>
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="col-12">
+            <div class="alert alert-info">
+                <i class="fas fa-info-circle me-2"></i>No devices are currently connected.
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.querySelectorAll('.ping-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const ip = this.dataset.ip;
+        const resultsDiv = this.parentElement.nextElementSibling;
+        
+        resultsDiv.style.display = 'block';
+        resultsDiv.className = 'ping-results mt-2 alert alert-info';
+        resultsDiv.innerHTML = 'Pinging ' + ip + '...';
+        
+        fetch('/ping', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ip_address: ip})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultsDiv.className = 'ping-results mt-2 alert alert-success';
+                resultsDiv.innerHTML = `
+                    <h6>Ping Results for ${data.target}</h6>
+                    <pre class="mb-0 small">${data.results.join('\n')}</pre>
+                `;
+            } else {
+                resultsDiv.className = 'ping-results mt-2 alert alert-danger';
+                resultsDiv.innerHTML = `
+                    <h6>Ping Failed</h6>
+                    <p class="mb-0">${data.error}</p>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsDiv.className = 'ping-results mt-2 alert alert-danger';
+            resultsDiv.innerHTML = 'Error performing ping';
+        });
+    });
+});
+
+// Auto-refresh the page every 30 seconds
+setTimeout(() => {
+    window.location.reload();
+}, 30000);
+</script>
+{% endblock %}

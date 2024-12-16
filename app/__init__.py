@@ -20,9 +20,6 @@ def create_app(config_class=Config):
     from app.auth import bp as auth_bp
     app.register_blueprint(auth_bp, url_prefix='/auth')
 
-    from app.monitor import bp as monitor_bp
-    app.register_blueprint(monitor_bp, url_prefix='/monitor')
-
     from app.main import bp as main_bp
     app.register_blueprint(main_bp)
 
@@ -31,6 +28,12 @@ def create_app(config_class=Config):
 
     from app.cli import create_test_data
     app.cli.add_command(create_test_data)
+
+    from datetime import datetime
+
+    @app.context_processor
+    def inject_now():
+        return {'year': datetime.utcnow().year}
 
     return app
 

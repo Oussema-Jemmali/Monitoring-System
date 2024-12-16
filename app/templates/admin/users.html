@@ -1,59 +1,209 @@
 {% extends "base.html" %}
 
 {% block content %}
-<div class="container mt-4">
-    <div class="alert alert-info">
-        <h4 class="alert-heading"><i class="fas fa-shield-alt"></i> Admin Mode - User Management</h4>
-        <p>You can view and manage all registered users from this page.</p>
+<div class="container">
+    <div class="row mb-4">
+        <div class="col-md-12">
+            <h2>User Management</h2>
+        </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h3><i class="fas fa-users"></i> Registered Users</h3>
-        </div>
-        <div class="card-body">
-            <div class="table-responsive">
-                <table class="table table-hover">
-                    <thead>
-                        <tr>
-                            <th>Username</th>
-                            <th>Email</th>
-                            <th>Admin Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for user in users %}
-                        <tr>
-                            <td>{{ user.username }}</td>
-                            <td>{{ user.email }}</td>
-                            <td>
-                                {% if user.is_admin %}
-                                <span class="badge bg-success">Admin</span>
-                                {% else %}
-                                <span class="badge bg-secondary">User</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if user != current_user %}
-                                <form action="{{ url_for('admin.delete_user', user_id=user.id) }}" 
-                                      method="POST" 
-                                      class="d-inline" 
-                                      onsubmit="return confirm('Are you sure you want to delete this user?');">
-                                    <button type="submit" class="btn btn-danger btn-sm">
-                                        <i class="fas fa-trash"></i> Delete
-                                    </button>
-                                </form>
-                                {% else %}
-                                <span class="text-muted">Current User</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card">
+                <div class="card-header">
+                    <h4>Users</h4>
+                </div>
+                <div class="card-body">
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Username</th>
+                                    <th>Email</th>
+                                    <th>IP Address</th>
+                                    <th>Department</th>
+                                    <th>Status</th>
+                                    <th>Last Seen</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for user in users %}
+                                <tr>
+                                    <td>{{ user.username }}</td>
+                                    <td>{{ user.email }}</td>
+                                    <td>{{ user.ip_address }}</td>
+                                    <td>{{ user.department }}</td>
+                                    <td>
+                                        <span class="badge bg-{{ 'success' if user.is_online else 'danger' }}">
+                                            {{ 'Online' if user.is_online else 'Offline' }}
+                                        </span>
+                                    </td>
+                                    <td>{{ user.last_seen.strftime('%Y-%m-%d %H:%M:%S') if user.last_seen }}</td>
+                                    <td>
+                                        <div class="btn-group">
+                                            <button class="btn btn-sm btn-primary ping-btn" data-ip="{{ user.ip_address }}" title="Ping User">
+                                                <i class="fas fa-network-wired"></i>
+                                            </button>
+                                            <button class="btn btn-sm btn-warning alert-btn" data-user-id="{{ user.id }}" title="Send Alert">
+                                                <i class="fas fa-bell"></i>
+                                            </button>
+                                            {% if user.id != current_user.id %}
+                                            <button class="btn btn-sm btn-danger delete-btn" data-user-id="{{ user.id }}" title="Delete User">
+                                                <i class="fas fa-trash"></i>
+                                            </button>
+                                            {% endif %}
+                                        </div>
+                                    </td>
+                                </tr>
+                                <tr class="ping-results-row" id="ping-results-{{ loop.index }}" style="display: none;">
+                                    <td colspan="7">
+                                        <div class="ping-results alert"></div>
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 </div>
+{% endblock %}
+
+{% block scripts %}
+{{ super() }}
+<script>
+document.querySelectorAll('.ping-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const ip = this.dataset.ip;
+        const row = this.closest('tr');
+        const resultsRow = row.nextElementSibling;
+        const resultsDiv = resultsRow.querySelector('.ping-results');
+        
+        resultsRow.style.display = 'table-row';
+        resultsDiv.className = 'ping-results alert alert-info';
+        resultsDiv.innerHTML = 'Pinging ' + ip + '...';
+        
+        fetch('/ping', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ip_address: ip})
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.success) {
+                resultsDiv.className = 'ping-results alert alert-success';
+                resultsDiv.innerHTML = `
+                    <h5>Ping Results for ${data.target}</h5>
+                    <pre class="mb-0">${data.results.join('\n')}</pre>
+                `;
+            } else {
+                resultsDiv.className = 'ping-results alert alert-danger';
+                resultsDiv.innerHTML = `
+                    <h5>Ping Failed</h5>
+                    <p>${data.error}</p>
+                `;
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            resultsDiv.className = 'ping-results alert alert-danger';
+            resultsDiv.innerHTML = 'Error performing ping';
+        });
+    });
+});
+
+// Delete User functionality
+document.querySelectorAll('.delete-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const userId = this.dataset.userId;
+        const username = this.closest('tr').querySelector('td:first-child').textContent;
+        
+        if (confirm(`Are you sure you want to delete user "${username}"? This action cannot be undone.`)) {
+            fetch(`/admin/user/${userId}/delete`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    this.closest('tr').remove();
+                    showToast('Success', `User "${username}" has been deleted.`, 'success');
+                } else {
+                    showToast('Error', data.error || 'Failed to delete user.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error', 'An error occurred while deleting the user.', 'error');
+            });
+        }
+    });
+});
+
+// Alert User functionality
+document.querySelectorAll('.alert-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const userId = this.dataset.userId;
+        const username = this.closest('tr').querySelector('td:first-child').textContent;
+        
+        const message = prompt(`Enter alert message for user "${username}":`);
+        if (message) {
+            fetch(`/admin/user/${userId}/alert`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ message: message })
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('Success', `Alert sent to "${username}".`, 'success');
+                } else {
+                    showToast('Error', data.error || 'Failed to send alert.', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                showToast('Error', 'An error occurred while sending the alert.', 'error');
+            });
+        }
+    });
+});
+
+// Toast notification function
+function showToast(title, message, type) {
+    const toast = document.createElement('div');
+    toast.className = `toast position-fixed bottom-0 end-0 m-3 bg-${type === 'success' ? 'success' : 'danger'} text-white`;
+    toast.setAttribute('role', 'alert');
+    toast.setAttribute('aria-live', 'assertive');
+    toast.setAttribute('aria-atomic', 'true');
+    
+    toast.innerHTML = `
+        <div class="toast-header bg-${type === 'success' ? 'success' : 'danger'} text-white">
+            <strong class="me-auto">${title}</strong>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="toast" aria-label="Close"></button>
+        </div>
+        <div class="toast-body">
+            ${message}
+        </div>
+    `;
+    
+    document.body.appendChild(toast);
+    const bsToast = new bootstrap.Toast(toast);
+    bsToast.show();
+    
+    toast.addEventListener('hidden.bs.toast', () => {
+        toast.remove();
+    });
+}
+</script>
 {% endblock %}

@@ -1,0 +1,271 @@
+// Variables
+$primary-color: #1a237e;  // Deep blue
+$secondary-color: #00c853; // Bright green
+$dark-bg: #121212;
+$card-bg: #1e1e1e;
+$text-primary: #ffffff;
+$text-secondary: #b0bec5;
+$success-color: #00c853;
+$warning-color: #ffd600;
+$danger-color: #ff1744;
+$gradient-primary: linear-gradient(135deg, $primary-color, #283593);
+$box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+
+// Mixins
+@mixin card-hover {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  &:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.2);
+  }
+}
+
+@mixin glow-effect($color) {
+  box-shadow: 0 0 15px rgba($color, 0.3);
+  transition: box-shadow 0.3s ease;
+  &:hover {
+    box-shadow: 0 0 25px rgba($color, 0.5);
+  }
+}
+
+// Global Styles
+body {
+  background: $dark-bg;
+  color: $text-primary;
+  font-family: 'Roboto', sans-serif;
+  background-image: 
+    radial-gradient(circle at 25px 25px, rgba(255, 255, 255, 0.2) 2%, transparent 0%),
+    radial-gradient(circle at 75px 75px, rgba(255, 255, 255, 0.2) 2%, transparent 0%);
+  background-size: 100px 100px;
+}
+
+// Navbar Styles
+.navbar {
+  background: $gradient-primary !important;
+  backdrop-filter: blur(10px);
+  box-shadow: $box-shadow;
+  
+  .navbar-brand {
+    font-weight: 700;
+    letter-spacing: 1px;
+    
+    &:before {
+      content: '⚡';
+      margin-right: 8px;
+    }
+  }
+  
+  .nav-link {
+    position: relative;
+    padding: 0.5rem 1rem;
+    
+    &:after {
+      content: '';
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      width: 0;
+      height: 2px;
+      background: $secondary-color;
+      transition: all 0.3s ease;
+      transform: translateX(-50%);
+    }
+    
+    &:hover:after {
+      width: 80%;
+    }
+  }
+}
+
+// Card Styles
+.card {
+  background: $card-bg;
+  border: none;
+  border-radius: 15px;
+  @include card-hover;
+  margin-bottom: 1.5rem;
+  overflow: hidden;
+  
+  .card-header {
+    background: $gradient-primary;
+    border-bottom: none;
+    padding: 1.25rem;
+    
+    h5, h6 {
+      margin: 0;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      
+      i {
+        margin-right: 10px;
+      }
+    }
+  }
+  
+  &.info-card {
+    @include glow-effect($primary-color);
+  }
+  
+  &.system-card {
+    @include glow-effect($secondary-color);
+  }
+  
+  &.network-card {
+    @include glow-effect($warning-color);
+  }
+}
+
+// Table Styles
+.table {
+  color: $text-secondary;
+  margin: 0;
+  
+  th {
+    font-weight: 600;
+    color: $text-primary;
+    border-top: none;
+    padding: 1rem;
+  }
+  
+  td {
+    padding: 1rem;
+    border-color: rgba(255, 255, 255, 0.1);
+  }
+  
+  tbody tr {
+    transition: background-color 0.3s ease;
+    
+    &:hover {
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+  }
+}
+
+// Status Badge Styles
+.badge {
+  padding: 0.5em 1em;
+  border-radius: 50px;
+  font-weight: 500;
+  
+  &.bg-success {
+    background: $success-color !important;
+    @include glow-effect($success-color);
+  }
+  
+  &.bg-warning {
+    background: $warning-color !important;
+    @include glow-effect($warning-color);
+  }
+  
+  &.bg-danger {
+    background: $danger-color !important;
+    @include glow-effect($danger-color);
+  }
+}
+
+// Animation for Loading States
+@keyframes pulse {
+  0% { opacity: 1; }
+  50% { opacity: 0.5; }
+  100% { opacity: 1; }
+}
+
+.loading {
+  animation: pulse 1.5s infinite;
+}
+
+// Network Graph Visualization
+.network-graph {
+  canvas {
+    border-radius: 15px;
+    background: rgba(0, 0, 0, 0.2);
+    @include glow-effect($primary-color);
+  }
+}
+
+// Responsive Design
+@media (max-width: 768px) {
+  .card {
+    margin-bottom: 1rem;
+  }
+  
+  .table-responsive {
+    border-radius: 15px;
+    overflow: hidden;
+  }
+}
+
+// Custom Scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: $dark-bg;
+}
+
+::-webkit-scrollbar-thumb {
+  background: $primary-color;
+  border-radius: 4px;
+  
+  &:hover {
+    background: lighten($primary-color, 10%);
+  }
+}
+
+// Alert Styles
+.alert {
+  border: none;
+  border-radius: 10px;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  backdrop-filter: blur(10px);
+  
+  &.alert-success {
+    background: rgba($success-color, 0.1);
+    color: $success-color;
+    @include glow-effect($success-color);
+  }
+  
+  &.alert-warning {
+    background: rgba($warning-color, 0.1);
+    color: $warning-color;
+    @include glow-effect($warning-color);
+  }
+  
+  &.alert-danger {
+    background: rgba($danger-color, 0.1);
+    color: $danger-color;
+    @include glow-effect($danger-color);
+  }
+}
+
+// Button Styles
+.btn {
+  border-radius: 50px;
+  padding: 0.5rem 1.5rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  transition: all 0.3s ease;
+  
+  &.btn-primary {
+    background: $gradient-primary;
+    border: none;
+    @include glow-effect($primary-color);
+  }
+  
+  &.btn-success {
+    background: $success-color;
+    border: none;
+    @include glow-effect($success-color);
+  }
+  
+  &.btn-warning {
+    background: $warning-color;
+    border: none;
+    @include glow-effect($warning-color);
+  }
+}

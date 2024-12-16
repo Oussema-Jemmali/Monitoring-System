@@ -1,5 +1,5 @@
 from app import db, create_app
-from app.models import User, Device, MonitoringResult, Alert
+from app.models import User
 from datetime import datetime
 import os
 
@@ -60,59 +60,12 @@ def init_db():
             db.session.add(user2)
             db.session.flush()
 
-            # Create some devices
-            device1 = Device(
-                hostname='laptop1',
-                ip_address='192.168.1.100',
-                mac_address='00:11:22:33:44:55',
-                device_type='Laptop',
-                status='UP',
-                user_id=user1.id
-            )
-            db.session.add(device1)
-            db.session.flush()
-
-            device2 = Device(
-                hostname='desktop1',
-                ip_address='192.168.1.101',
-                mac_address='00:11:22:33:44:66',
-                device_type='Desktop',
-                status='DOWN',
-                user_id=user2.id
-            )
-            db.session.add(device2)
-            db.session.flush()
-
-            # Create some alerts
-            alert1 = Alert(
-                device_id=device1.id,
-                user_id=user1.id,
-                alert_type='connection',
-                message='Connection lost to device',
-                severity='high',
-                timestamp=datetime.utcnow()
-            )
-            db.session.add(alert1)
-            db.session.flush()
-
-            alert2 = Alert(
-                device_id=device2.id,
-                user_id=user2.id,
-                alert_type='security',
-                message='Unauthorized access attempt',
-                severity='critical',
-                timestamp=datetime.utcnow()
-            )
-            db.session.add(alert2)
-            
             # Commit all changes
             db.session.commit()
-            print("Database created successfully with sample data!")
-            
+            print("Database initialized successfully!")
         except Exception as e:
-            db.session.rollback()
             print(f"Error creating database: {str(e)}")
-            raise
+            db.session.rollback()
 
 if __name__ == '__main__':
     init_db()

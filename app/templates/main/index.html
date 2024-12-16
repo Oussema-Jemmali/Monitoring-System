@@ -1,138 +1,150 @@
 {% extends "base.html" %}
 
-{% block styles %}
-{{ super() }}
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/dist/dist/vis-network.min.css">
-{% endblock %}
-
 {% block content %}
-<div class="container">
+<div class="container-fluid px-4">
+    <!-- Header Section -->
     <div class="row mb-4">
-        <div class="col-md-12">
-            <h2>Network Monitoring Dashboard</h2>
-        </div>
-    </div>
-
-    <!-- Network Tools Section -->
-    <div class="row mb-4">
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h4>Network Tools</h4>
-                </div>
-                <div class="card-body">
+        <div class="col-12">
+            <div class="d-flex justify-content-between align-items-center">
+                <h1 class="h3">Welcome, {{ current_user.username }}</h1>
+                <div class="btn-group">
                     {% if current_user.is_admin %}
-                    <div class="mb-3">
-                        <a href="{{ url_for('admin.users') }}" class="btn btn-warning w-100">
-                            <i class="fas fa-users"></i> Manage Users
-                        </a>
-                    </div>
-                    <hr>
+                    <a href="{{ url_for('admin.users') }}" class="btn btn-warning">
+                        <i class="fas fa-users"></i> Manage Users
+                    </a>
                     {% endif %}
-                    <div class="mb-3">
-                        <button id="show-ip-btn" class="btn btn-primary">Show My IP Address</button>
-                        <p class="mt-2">Your IP: <span id="ip-display">Click button to show</span></p>
-                    </div>
-                    <div class="mb-3">
-                        <label for="ip-input" class="form-label">IP Address for CIDR Calculation:</label>
-                        <input type="text" class="form-control" id="ip-input">
-                        <button id="calculate-cidr-btn" class="btn btn-primary mt-2">Calculate CIDR</button>
-                        <div id="cidr-results"></div>
-                    </div>
-                    <div class="mb-3 mt-4">
-                        <label for="ping-ip-input" class="form-label">IP Address to Ping:</label>
-                        <div class="input-group">
-                            <input type="text" class="form-control" id="ping-ip-input" value="127.0.0.1" placeholder="Enter IP address">
-                            <button id="ping-ip-btn" class="btn btn-primary">Ping</button>
-                        </div>
-                        <div id="ping-results" class="mt-2"></div>
-                    </div>
-                    <div class="mb-3 mt-4">
-                        <button id="show-system-info-btn" class="btn btn-primary">Show System Information</button>
-                        <div id="system-info" class="mt-2"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-        <div class="col-md-6">
-            <div class="card">
-                <div class="card-header">
-                    <h4>Network Visualization</h4>
-                </div>
-                <div class="card-body">
-                    <div id="network" style="height: 400px; border: 1px solid #ddd; background-color: #f8f9fa;"></div>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Quick Stats Row -->
+    <div class="row mb-4">
+        <div class="col-xl-3 col-md-6">
+            <div class="card bg-primary text-white h-100">
+                <div class="card-body">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="h6 text-uppercase mb-0">Online Users</div>
+                            <div class="h2 mb-0">{{ users_info|selectattr('system_info.is_online')|list|length }}</div>
+                        </div>
+                        <div>
+                            <i class="fas fa-users fa-2x opacity-75"></i>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content Row -->
     <div class="row">
-        <!-- Network Status Overview -->
-        <div class="col-md-8">
-            <div class="card mb-4">
-                <div class="card-header">
-                    <h4>Network Status</h4>
+        <!-- Network Visualization Column -->
+        <div class="col-xl-8 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-network-wired me-2"></i>Network Topology
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div id="network-visualization"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Network Tools Column -->
+        <div class="col-xl-4 mb-4">
+            <div class="card h-100">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">
+                        <i class="fas fa-tools me-2"></i>Network Tools
+                    </h5>
+                </div>
+                <div class="card-body">
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">IP Address Info</label>
+                        <button id="show-ip-btn" class="btn btn-primary w-100 mb-2">
+                            <i class="fas fa-info-circle me-2"></i>Show My IP Address
+                        </button>
+                        <p class="mb-0">Your IP: <span id="ip-display" class="fw-bold ip-hidden">Click button to show</span></p>
+                    </div>
+
+                    <div class="mb-4">
+                        <label for="ping-input" class="form-label fw-bold">Ping Test</label>
+                        <div class="input-group mb-2">
+                            <input type="text" class="form-control" id="ping-input" placeholder="Enter IP address">
+                            <button id="ping-btn" class="btn btn-primary">
+                                <i class="fas fa-network-wired"></i>
+                            </button>
+                        </div>
+                        <div id="ping-results"></div>
+                    </div>
+
+                    <div>
+                        <label for="ip-input" class="form-label fw-bold">CIDR Calculator</label>
+                        <input type="text" class="form-control mb-2" id="ip-input" placeholder="Enter IP address">
+                        <button id="calculate-cidr-btn" class="btn btn-primary w-100">
+                            <i class="fas fa-calculator me-2"></i>Calculate CIDR
+                        </button>
+                        <div id="cidr-results" class="mt-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Connected Devices Row -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header bg-light">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">
+                            <i class="fas fa-desktop me-2"></i>Connected Devices
+                        </h5>
+                        <span class="badge bg-primary">{{ users_info|length }} Devices</span>
+                    </div>
                 </div>
                 <div class="card-body">
                     <div class="row">
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <h5>Total Devices</h5>
-                                <h2>{{ devices|length }}</h2>
+                        {% for user_info in users_info %}
+                        <div class="col-xl-4 col-md-6 mb-4">
+                            <div class="card h-100 {% if user_info.system_info.is_online %}border-success{% else %}border-danger{% endif %}">
+                                <div class="card-header d-flex justify-content-between align-items-center {% if user_info.system_info.is_online %}bg-success{% else %}bg-danger{% endif %} text-white">
+                                    <h6 class="mb-0">
+                                        <i class="fas fa-desktop me-2"></i>{{ user_info.username }}
+                                    </h6>
+                                    <span class="badge bg-white text-{% if user_info.system_info.is_online %}success{% else %}danger{% endif %}">
+                                        {{ 'Online' if user_info.system_info.is_online else 'Offline' }}
+                                    </span>
+                                </div>
+                                <div class="card-body">
+                                    <div class="mb-3">
+                                        <h6 class="text-muted mb-2">User Information</h6>
+                                        <div class="small">
+                                            <div><strong>IP Address:</strong> {{ user_info.ip_address }}</div>
+                                            <div><strong>Department:</strong> {{ user_info.department }}</div>
+                                            <div><strong>Last Seen:</strong> {{ user_info.last_seen }}</div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div class="text-end">
+                                        <button class="btn btn-sm btn-primary device-ping-btn" data-ip="{{ user_info.ip_address }}">
+                                            <i class="fas fa-network-wired me-1"></i>Ping
+                                        </button>
+                                    </div>
+                                    <div class="device-ping-results mt-2" style="display: none;"></div>
+                                </div>
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <h5>Online</h5>
-                                <h2 class="text-success">{{ devices|selectattr('status', 'equalto', 'online')|list|length }}</h2>
+                        {% else %}
+                        <div class="col-12">
+                            <div class="alert alert-info mb-0">
+                                <i class="fas fa-info-circle me-2"></i>No devices are currently connected.
                             </div>
                         </div>
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <h5>Issues</h5>
-                                <h2 class="text-danger">{{ devices|selectattr('status', 'equalto', 'DOWN')|list|length }}</h2>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Device List -->
-            <div class="card">
-                <div class="card-header d-flex justify-content-between align-items-center">
-                    <h4>Devices</h4>
-                    <a href="{{ url_for('monitor.devices') }}" class="btn btn-primary btn-sm">View All</a>
-                </div>
-                <div class="card-body">
-                    <div class="table-responsive">
-                        <table class="table">
-                            <thead>
-                                <tr>
-                                    <th>Hostname</th>
-                                    <th>IP Address</th>
-                                    <th>Status</th>
-                                    <th>Last Seen</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for device in devices %}
-                                <tr>
-                                    <td>{{ device.hostname }}</td>
-                                    <td>{{ device.ip_address }}</td>
-                                    <td>
-                                        {% if device.status == 'online' %}
-                                        <span class="badge bg-success">Online</span>
-                                        {% elif device.status == 'offline' %}
-                                        <span class="badge bg-danger">Offline</span>
-                                        {% else %}
-                                        <span class="badge bg-warning">Unknown</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>{{ device.last_seen.strftime('%Y-%m-%d %H:%M:%S') if device.last_seen }}</td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+                        {% endfor %}
                     </div>
                 </div>
             </div>
@@ -141,9 +153,237 @@
 </div>
 {% endblock %}
 
+{% block styles %}
+{{ super() }}
+<style>
+    @keyframes fadeInHighlight {
+        0% {
+            opacity: 0;
+            background-color: rgba(0, 123, 255, 0.2);
+            transform: translateY(-5px);
+        }
+        50% {
+            background-color: rgba(0, 123, 255, 0.2);
+            transform: translateY(0);
+        }
+        100% {
+            opacity: 1;
+            background-color: transparent;
+            transform: translateY(0);
+        }
+    }
+
+    .ip-hidden {
+        opacity: 0;
+    }
+
+    .ip-show {
+        animation: fadeInHighlight 1s ease-out forwards;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+</style>
+{% endblock %}
+
 {% block scripts %}
 {{ super() }}
-<script src="https://cdnjs.cloudflare.com/ajax/libs/vis-network/9.1.6/dist/vis-network.min.js"></script>
-<script src="{{ url_for('static', filename='js/network.js') }}"></script>
-<script src="{{ url_for('static', filename='js/network-tools.js') }}"></script>
+<script>
+// Network Visualization
+let network = null;
+
+function initializeNetwork() {
+    const container = document.getElementById('network-visualization');
+    
+    // Configuration for the network
+    const options = {
+        nodes: {
+            font: {
+                size: 14,
+                face: 'Roboto'
+            },
+            borderWidth: 2,
+            shadow: true
+        },
+        edges: {
+            width: 2,
+            shadow: true,
+            smooth: {
+                type: 'continuous'
+            }
+        },
+        physics: {
+            enabled: true,
+            barnesHut: {
+                gravitationalConstant: -2000,
+                centralGravity: 0.3,
+                springLength: 200
+            }
+        },
+        groups: {
+            gateway: {
+                color: {
+                    background: '#ff9800',
+                    border: '#f57c00'
+                }
+            },
+            user: {
+                shape: 'dot'
+            }
+        },
+        interaction: {
+            hover: true,
+            tooltipDelay: 200
+        }
+    };
+    
+    // Create the network
+    fetch('/network_data')
+        .then(response => response.json())
+        .then(data => {
+            const nodes = new vis.DataSet(data.nodes);
+            const edges = new vis.DataSet(data.edges);
+            
+            network = new vis.Network(container, { nodes, edges }, options);
+            
+            // Add click event
+            network.on('click', function(params) {
+                if (params.nodes.length > 0) {
+                    const nodeId = params.nodes[0];
+                    const node = nodes.get(nodeId);
+                    if (node.group === 'user') {
+                        // Extract IP address from label
+                        const ipAddress = node.label.split('\n')[1];
+                        // Set the IP in the ping input
+                        document.getElementById('ping-input').value = ipAddress;
+                        // Scroll to ping section smoothly
+                        document.getElementById('ping-input').scrollIntoView({ 
+                            behavior: 'smooth',
+                            block: 'center'
+                        });
+                        // Focus the input
+                        document.getElementById('ping-input').focus();
+                    }
+                }
+            });
+        })
+        .catch(error => {
+            console.error('Error loading network data:', error);
+            container.innerHTML = '<div class="alert alert-danger">Error loading network visualization</div>';
+        });
+}
+
+// Initialize network on page load
+initializeNetwork();
+
+// Refresh network data every 30 seconds
+setInterval(initializeNetwork, 30000);
+
+document.getElementById('show-ip-btn').addEventListener('click', function() {
+    fetch('/get_ip')
+        .then(response => response.json())
+        .then(data => {
+            const ipDisplay = document.getElementById('ip-display');
+            ipDisplay.textContent = data.ip;
+            ipDisplay.classList.remove('ip-hidden');
+            ipDisplay.classList.remove('ip-show');
+            // Trigger reflow to restart animation
+            void ipDisplay.offsetWidth;
+            ipDisplay.classList.add('ip-show');
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const ipDisplay = document.getElementById('ip-display');
+            ipDisplay.textContent = 'Error fetching IP';
+            ipDisplay.style.color = 'red';
+        });
+});
+
+function handlePingRequest(ipInput, resultsDiv) {
+    resultsDiv.innerHTML = '<div class="alert alert-info">Pinging ' + ipInput + '...</div>';
+    
+    fetch('/ping', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ip_address: ipInput})
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-success">
+                    <h6 class="mb-2">Ping Results for ${data.target}</h6>
+                    <pre class="mb-0 small">${data.results.join('\n')}</pre>
+                </div>
+            `;
+        } else {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-danger">
+                    <h6 class="mb-2">Ping Failed</h6>
+                    <p class="mb-0">${data.error}</p>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        resultsDiv.innerHTML = 
+            '<div class="alert alert-danger">Error performing ping</div>';
+    });
+}
+
+document.getElementById('ping-btn').addEventListener('click', function() {
+    const ipInput = document.getElementById('ping-input').value;
+    const resultsDiv = document.getElementById('ping-results');
+    handlePingRequest(ipInput, resultsDiv);
+});
+
+document.querySelectorAll('.device-ping-btn').forEach(button => {
+    button.addEventListener('click', function() {
+        const ip = this.dataset.ip;
+        const resultsDiv = this.parentElement.nextElementSibling;
+        resultsDiv.style.display = 'block';
+        handlePingRequest(ip, resultsDiv);
+    });
+});
+
+document.getElementById('calculate-cidr-btn').addEventListener('click', function() {
+    const ipInput = document.getElementById('ip-input').value;
+    fetch('/calculate_cidr', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ip_address: ipInput})
+    })
+    .then(response => response.json())
+    .then(data => {
+        const resultsDiv = document.getElementById('cidr-results');
+        if (data.error) {
+            resultsDiv.innerHTML = `<div class="alert alert-danger">${data.error}</div>`;
+        } else {
+            resultsDiv.innerHTML = `
+                <div class="alert alert-info mb-0">
+                    <div class="mb-1"><strong>Network Address:</strong> ${data.network_address}</div>
+                    <div class="mb-1"><strong>Broadcast Address:</strong> ${data.broadcast_address}</div>
+                    <div class="mb-1"><strong>First Host:</strong> ${data.first_host}</div>
+                    <div class="mb-1"><strong>Last Host:</strong> ${data.last_host}</div>
+                    <div><strong>Total Hosts:</strong> ${data.total_hosts}</div>
+                </div>
+            `;
+        }
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        document.getElementById('cidr-results').innerHTML = 
+            '<div class="alert alert-danger">Error calculating CIDR</div>';
+    });
+});
+
+// Auto-refresh the page every 30 seconds
+setTimeout(() => {
+    window.location.reload();
+}, 30000);
+</script>
 {% endblock %}

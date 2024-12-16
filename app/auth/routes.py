@@ -4,6 +4,7 @@ from app.auth import bp
 from app.auth.forms import LoginForm, RegistrationForm
 from app.models import User
 from app import db
+from datetime import datetime
 
 @bp.route('/login', methods=['GET', 'POST'])
 def login():
@@ -15,6 +16,9 @@ def login():
         if user is None or not user.check_password(form.password.data):
             flash('Invalid username or password', 'danger')
             return redirect(url_for('auth.login'))
+        user.is_online = True
+        user.last_seen = datetime.utcnow()
+        db.session.commit()
         login_user(user, remember=form.remember_me.data)
         next_page = request.args.get('next')
         if not next_page or not next_page.startswith('/'):
@@ -24,6 +28,9 @@ def login():
 
 @bp.route('/logout')
 def logout():
+    if current_user.is_authenticated:
+        current_user.is_online = False
+        db.session.commit()
     logout_user()
     return redirect(url_for('main.index'))
 

@@ -20,7 +20,6 @@ class User(UserMixin, db.Model):
     is_admin = db.Column(db.Boolean, default=False)
     is_online = db.Column(db.Boolean, default=False)
     last_seen = db.Column(db.DateTime, default=datetime.utcnow)
-    devices = db.relationship('Device', backref='owner', lazy='dynamic')
 
     def __repr__(self):
         return f'<User {self.username}>'
@@ -60,25 +59,37 @@ class User(UserMixin, db.Model):
             'last_seen': self.last_seen.strftime('%Y-%m-%d %H:%M:%S') if self.last_seen else None
         }
 
-class Device(db.Model):
+class Alert(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    hostname = db.Column(db.String(64), nullable=False)
-    ip_address = db.Column(db.String(15), nullable=False)
-    mac_address = db.Column(db.String(17))
-    device_type = db.Column(db.String(32))
-    status = db.Column(db.String(16), default='unknown')
-    last_seen = db.Column(db.DateTime, default=datetime.utcnow)
-    user_id = db.Column(db.Integer, db.ForeignKey('user.id'))
-    monitoring_results = db.relationship('MonitoringResult', backref='device', lazy='dynamic')
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    sender_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    message = db.Column(db.String(500), nullable=False)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+    read = db.Column(db.Boolean, default=False)
 
-    def __repr__(self):
-        return f'<Device {self.hostname}>'
+    # Relationships
+    user = db.relationship('User', foreign_keys=[user_id], backref=db.backref('alerts_received', lazy='dynamic'))
+    sender = db.relationship('User', foreign_keys=[sender_id], backref=db.backref('alerts_sent', lazy='dynamic'))
 
-class MonitoringResult(db.Model):
+    def to_dict(self):
+        return {
+            'id': self.id,
+            'message': self.message,
+            'timestamp': self.timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+            'sender': self.sender.username,
+            'read': self.read
+        }
+
+class SystemInfo(db.Model):
     id = db.Column(db.Integer, primary_key=True)
-    device_id = db.Column(db.Integer, db.ForeignKey('device.id'), nullable=False)
-    status = db.Column(db.String(16), nullable=False)
+    hostname = db.Column(db.String(64))
+    os = db.Column(db.String(64))
+    cpu = db.Column(db.String(128))
+    memory_total = db.Column(db.Float)
+    memory_used = db.Column(db.Float)
+    disk_total = db.Column(db.Float)
+    disk_used = db.Column(db.Float)
     timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
     def __repr__(self):
-        return f'<MonitoringResult {self.device_id} {self.status}>'
+        return f'<SystemInfo {self.hostname}>'
