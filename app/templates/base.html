@@ -47,6 +47,12 @@
                         </a>
                     </li>
                     {% endif %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="{{ url_for('alerts_page') }}">
+                            <i class="fas fa-bell"></i> Alerts
+                            <span id="nav-alerts-badge" class="badge bg-danger" style="display: none;"></span>
+                        </a>
+                    </li>
                     {% endif %}
                 </ul>
                 <ul class="navbar-nav">
@@ -116,5 +122,31 @@
     {% if current_user.is_authenticated %}
     <script src="{{ url_for('static', filename='js/network.js') }}"></script>
     {% endif %}
+    <script>
+        // Function to update the alerts badge in navigation
+        function updateNavAlertsBadge() {
+            if (document.getElementById('nav-alerts-badge')) {
+                fetch('/alerts/unread')
+                    .then(response => response.json())
+                    .then(data => {
+                        const badge = document.getElementById('nav-alerts-badge');
+                        if (data.unread_count > 0) {
+                            badge.textContent = data.unread_count;
+                            badge.style.display = 'inline';
+                        } else {
+                            badge.style.display = 'none';
+                        }
+                    })
+                    .catch(error => console.error('Error:', error));
+            }
+        }
+
+        // Update alerts badge when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            updateNavAlertsBadge();
+            // Refresh alerts badge every 30 seconds
+            setInterval(updateNavAlertsBadge, 30000);
+        });
+    </script>
 </body>
 </html>

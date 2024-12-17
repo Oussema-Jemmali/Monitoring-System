@@ -355,7 +355,7 @@ document.getElementById('calculate-cidr-btn').addEventListener('click', function
         headers: {
             'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ip_address: ipInput})
+        body: JSON.stringify({ip: ipInput})
     })
     .then(response => response.json())
     .then(data => {
@@ -365,11 +365,12 @@ document.getElementById('calculate-cidr-btn').addEventListener('click', function
         } else {
             resultsDiv.innerHTML = `
                 <div class="alert alert-info mb-0">
-                    <div class="mb-1"><strong>Network Address:</strong> ${data.network_address}</div>
-                    <div class="mb-1"><strong>Broadcast Address:</strong> ${data.broadcast_address}</div>
+                    <div class="mb-1"><strong>Network Address:</strong> ${data.network}</div>
+                    <div class="mb-1"><strong>Broadcast Address:</strong> ${data.broadcast}</div>
+                    <div class="mb-1"><strong>Netmask:</strong> ${data.netmask}</div>
                     <div class="mb-1"><strong>First Host:</strong> ${data.first_host}</div>
                     <div class="mb-1"><strong>Last Host:</strong> ${data.last_host}</div>
-                    <div><strong>Total Hosts:</strong> ${data.total_hosts}</div>
+                    <div><strong>Total Hosts:</strong> ${data.size - 2}</div>
                 </div>
             `;
         }

@@ -1,0 +1,112 @@
+<!-- Add this in your navigation or sidebar -->
+<li class="nav-item">
+    <a href="{{ url_for('alerts') }}" class="nav-link">
+        Alerts
+        <span id="alerts-badge" class="badge bg-danger"></span>
+    </a>
+</li>
+
+<!-- In the network visualization column, add this div -->
+<div class="col-md-6">
+    <!-- Existing Network Visualization Content -->
+    <div class="card mb-4">
+        <div class="card-header">
+            <h5 class="card-title">Network Visualization</h5>
+        </div>
+        <div class="card-body">
+            <!-- Existing network visualization content -->
+        </div>
+    </div>
+
+    <!-- New Alerts Card -->
+    <div class="card">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h5 class="card-title mb-0">
+                Recent Alerts
+                <span id="unread-badge" class="badge bg-danger ms-2"></span>
+            </h5>
+        </div>
+        <div class="card-body">
+            <div id="alerts-container" style="max-height: 300px; overflow-y: auto;">
+                <!-- Alerts will be loaded here dynamically -->
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Add this script at the bottom of your existing scripts -->
+<script>
+function loadAlerts() {
+    fetch('/alerts')
+        .then(response => response.json())
+        .then(alerts => {
+            const container = document.getElementById('alerts-container');
+            container.innerHTML = '';
+            
+            if (alerts.length === 0) {
+                container.innerHTML = '<div class="alert alert-info">No alerts to display</div>';
+                return;
+            }
+            
+            // Display only the 5 most recent alerts
+            alerts.slice(0, 5).forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert ${alert.read ? 'alert-secondary' : 'alert-primary'} mb-2`;
+                alertDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                            <strong class="d-block">From ${alert.sender}</strong>
+                            <small class="text-muted">${alert.timestamp}</small>
+                            <div class="mt-1">${alert.message}</div>
+                        </div>
+                        ${!alert.read ? `
+                            <button class="btn btn-sm btn-success ms-2" onclick="markAsRead(${alert.id})">
+                                Mark as Read
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(alertDiv);
+            });
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function loadUnreadCount() {
+    fetch('/alerts/unread')
+        .then(response => response.json())
+        .then(data => {
+            const badge = document.getElementById('unread-badge');
+            if (data.unread_count > 0) {
+                badge.textContent = data.unread_count;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function markAsRead(alertId) {
+    fetch(`/alerts/mark-read/${alertId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(() => {
+        loadAlerts();
+        loadUnreadCount();
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Load alerts when page loads
+document.addEventListener('DOMContentLoaded', () => {
+    loadAlerts();
+    loadUnreadCount();
+    // Refresh alerts every 30 seconds
+    setInterval(() => {
+        loadAlerts();
+        loadUnreadCount();
+    }, 30000);
+});
+</script> 

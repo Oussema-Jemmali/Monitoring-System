@@ -96,8 +96,8 @@ def calculate_cidr():
             'broadcast': str(network.broadcast),
             'netmask': str(network.netmask),
             'size': network.size,
-            'first_host': str(network.network + 1),
-            'last_host': str(network.broadcast - 1)
+            'first_host': str(network[1] if network.size > 2 else network.network),
+            'last_host': str(network[-2] if network.size > 2 else network.broadcast)
         })
     except Exception as e:
         return jsonify({'error': str(e)}), 400

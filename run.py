@@ -1,8 +1,8 @@
 from app import create_app, db
-from app.models import User
+from app.models import User, Alert
+from flask import jsonify, request, render_template
+from flask_login import login_required, current_user
 import psutil
-from flask import jsonify
-from flask_login import login_required
 
 app = create_app()
 app.config['DEBUG'] = True
@@ -42,6 +42,85 @@ def get_system_info():
 @login_required
 def system_info():
     return get_system_info()
+
+@app.route('/alerts', methods=['GET'])
+@login_required
+def get_alerts():
+    try:
+        alerts = Alert.query.filter_by(user_id=current_user.id)\
+                          .order_by(Alert.timestamp.desc())\
+                          .all()
+        return jsonify([alert.to_dict() for alert in alerts]), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/alerts/unread', methods=['GET'])
+@login_required
+def get_unread_alerts():
+    try:
+        unread_alerts = Alert.query.filter_by(
+            user_id=current_user.id,
+            read=False
+        ).count()
+        return jsonify({'unread_count': unread_alerts}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/alerts/mark-read/<int:alert_id>', methods=['POST'])
+@login_required
+def mark_alert_read(alert_id):
+    try:
+        alert = Alert.query.get_or_404(alert_id)
+        if alert.user_id != current_user.id:
+            return jsonify({'error': 'Unauthorized'}), 403
+        
+        alert.read = True
+        db.session.commit()
+        return jsonify({'message': 'Alert marked as read'}), 200
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/alerts/mark-all-read', methods=['POST'])
+@login_required
+def mark_all_alerts_read():
+    try:
+        Alert.query.filter_by(user_id=current_user.id, read=False).update({'read': True})
+        db.session.commit()
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/alerts/send', methods=['POST'])
+@login_required
+def send_alert():
+    if not current_user.is_admin:
+        return jsonify({'error': 'Unauthorized'}), 403
+    
+    try:
+        data = request.get_json()
+        user_id = data.get('user_id')
+        message = data.get('message')
+        
+        if not user_id or not message:
+            return jsonify({'error': 'Missing required fields'}), 400
+        
+        alert = Alert(
+            user_id=user_id,
+            sender_id=current_user.id,
+            message=message
+        )
+        db.session.add(alert)
+        db.session.commit()
+        
+        return jsonify({'message': 'Alert sent successfully'}), 201
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/alerts-page')
+@login_required
+def alerts_page():
+    return render_template('alerts.html')
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

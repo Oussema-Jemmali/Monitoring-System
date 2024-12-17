@@ -1,0 +1,203 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="row">
+        <div class="col-md-12">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h3 class="card-title mb-0">
+                        <i class="fas fa-bell me-2"></i>Alerts
+                        <span id="unread-badge" class="badge bg-danger ms-2"></span>
+                    </h3>
+                    <div>
+                        <button id="markAllRead" class="btn btn-light btn-sm" style="display: none;">
+                            <i class="fas fa-check-double me-1"></i>Mark All as Read
+                        </button>
+                    </div>
+                </div>
+                <div class="card-body">
+                    <div id="alerts-container">
+                        <!-- Loading spinner -->
+                        <div class="text-center py-4" id="loading-spinner">
+                            <div class="spinner-border text-primary" role="status">
+                                <span class="visually-hidden">Loading...</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+function formatTimestamp(timestamp) {
+    const date = new Date(timestamp);
+    return date.toLocaleString();
+}
+
+function loadAlerts() {
+    const loadingSpinner = document.getElementById('loading-spinner');
+    loadingSpinner.style.display = 'block';
+    
+    fetch('/alerts')
+        .then(response => response.json())
+        .then(alerts => {
+            const container = document.getElementById('alerts-container');
+            container.innerHTML = '';
+            
+            if (alerts.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-4 text-muted">
+                        <i class="fas fa-inbox fa-3x mb-3"></i>
+                        <h5>No alerts to display</h5>
+                        <p class="mb-0">You're all caught up!</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            alerts.forEach(alert => {
+                const alertDiv = document.createElement('div');
+                alertDiv.className = `alert ${alert.read ? 'alert-light' : 'alert-primary'} border shadow-sm mb-3`;
+                alertDiv.innerHTML = `
+                    <div class="d-flex justify-content-between align-items-start">
+                        <div class="flex-grow-1">
+                            <div class="d-flex align-items-center mb-1">
+                                <strong class="me-2">
+                                    <i class="fas fa-user-circle me-1"></i>${alert.sender}
+                                </strong>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>${formatTimestamp(alert.timestamp)}
+                                </small>
+                                ${!alert.read ? '<span class="badge bg-primary ms-2">New</span>' : ''}
+                            </div>
+                            <div class="alert-message">
+                                ${alert.message}
+                            </div>
+                        </div>
+                        ${!alert.read ? `
+                            <button class="btn btn-outline-success btn-sm ms-3" onclick="markAsRead(${alert.id}, this)">
+                                <i class="fas fa-check me-1"></i>Mark as Read
+                            </button>
+                        ` : ''}
+                    </div>
+                `;
+                container.appendChild(alertDiv);
+            });
+
+            // Show/hide mark all as read button
+            const hasUnread = alerts.some(alert => !alert.read);
+            document.getElementById('markAllRead').style.display = hasUnread ? 'block' : 'none';
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            const container = document.getElementById('alerts-container');
+            container.innerHTML = `
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    Failed to load alerts. Please try again later.
+                </div>
+            `;
+        })
+        .finally(() => {
+            loadingSpinner.style.display = 'none';
+        });
+}
+
+function loadUnreadCount() {
+    fetch('/alerts/unread')
+        .then(response => response.json())
+        .then(data => {
+            const badge = document.getElementById('unread-badge');
+            const count = data.unread_count;
+            if (count > 0) {
+                badge.textContent = count;
+                badge.style.display = 'inline';
+            } else {
+                badge.style.display = 'none';
+            }
+        })
+        .catch(error => console.error('Error:', error));
+}
+
+function markAsRead(alertId, button) {
+    // Disable the button and show loading state
+    button.disabled = true;
+    const originalText = button.innerHTML;
+    button.innerHTML = `
+        <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+        Marking...
+    `;
+
+    fetch(`/alerts/mark-read/${alertId}`, {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(() => {
+        // Change the alert's appearance
+        const alertDiv = button.closest('.alert');
+        alertDiv.classList.remove('alert-primary');
+        alertDiv.classList.add('alert-light');
+        
+        // Add a success checkmark and fade out the button
+        button.classList.remove('btn-outline-success');
+        button.classList.add('btn-success');
+        button.innerHTML = `<i class="fas fa-check"></i> Marked as Read`;
+        
+        // Animate the button removal
+        setTimeout(() => {
+            button.style.transition = 'opacity 0.5s';
+            button.style.opacity = '0';
+            setTimeout(() => {
+                button.remove();
+            }, 500);
+        }, 1000);
+
+        // Update unread count
+        loadUnreadCount();
+    })
+    .catch(error => {
+        console.error('Error:', error);
+        // Restore button state on error
+        button.disabled = false;
+        button.innerHTML = originalText;
+        // Show error message
+        const alertDiv = button.closest('.alert');
+        const errorMsg = document.createElement('div');
+        errorMsg.className = 'alert alert-danger mt-2 mb-0';
+        errorMsg.innerHTML = `<i class="fas fa-exclamation-circle"></i> Failed to mark as read. Please try again.`;
+        alertDiv.appendChild(errorMsg);
+        setTimeout(() => errorMsg.remove(), 3000);
+    });
+}
+
+function markAllAsRead() {
+    fetch('/alerts/mark-all-read', {
+        method: 'POST'
+    })
+    .then(response => response.json())
+    .then(() => {
+        loadAlerts();
+        loadUnreadCount();
+    })
+    .catch(error => console.error('Error:', error));
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', () => {
+    loadAlerts();
+    loadUnreadCount();
+    
+    // Add click handler for mark all as read button
+    document.getElementById('markAllRead').addEventListener('click', markAllAsRead);
+    
+    // Refresh alerts every 30 seconds
+    setInterval(() => {
+        loadAlerts();
+        loadUnreadCount();
+    }, 30000);
+});
+</script>
+{% endblock %}
